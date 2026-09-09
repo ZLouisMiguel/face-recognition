@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk files
+.DS_Store
+Thumbs.db
+
+# Project specific: Large ONNX models (download them manually)
+models/*.onnx
+models/*.onnx.*
+
+# Project specific: Downloaded archives
+*.zip
+*.tar.gz
+*.tgz
+buffalo_1/
+w600k_r50.onnx
+1k3d68.onnx
+2d106det.onnx
+det_10g.onnx
+genderage.onnx
+
+# Project specific: Generated biometric data (DO NOT COMMIT FACES/EMBEDDINGS)
+data/db/
+data/enroll/
+data/debug_aligned/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Logs and databases
+*.log
+*.sqlite3
+*.npz
