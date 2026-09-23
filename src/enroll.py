@@ -13,7 +13,8 @@ from .embed import FaceEmbedder
 class FaceEnroller:
     def __init__(self, db_path="data/database.json"):
         self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        database_dir = os.path.dirname(os.path.abspath(self.db_path))
+        os.makedirs(database_dir, exist_ok=True)
         self.database = self.load_database()
 
     def load_database(self):
@@ -23,6 +24,8 @@ class FaceEnroller:
         return {}
 
     def save_database(self):
+        database_dir = os.path.dirname(os.path.abspath(self.db_path))
+        os.makedirs(database_dir, exist_ok=True)
         with open(self.db_path, "w") as f:
             json.dump(self.database, f, indent=4)
 
@@ -48,7 +51,7 @@ class FaceEnroller:
         return True
 
 
-def run_enrollment(db_path="data/database.json", cam_source=0, samples_needed=15):
+def run_enrollment(db_path="data/database.json", cam_source=2, samples_needed=15):
     """
     Webcam-driven enrollment loop.
 

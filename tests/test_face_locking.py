@@ -1,10 +1,16 @@
 import unittest
 from dataclasses import dataclass
+import json
+import os
+import tempfile
 
 import numpy as np
 
 from src.face_signals import OutputSignalManager
 from src.face_tracking import TargetTracker
+from src.detect import FaceDetector
+from src.enroll import FaceEnroller
+from src.recognize import FaceRecognizer
 
 try:
     from src.face_tracking import TrackCandidate
@@ -92,6 +98,42 @@ class OutputSignalManagerTests(unittest.TestCase):
         signals.update_status(True, "Alice")
         signals.draw_overlay(frame.copy(), (10, 10, 40, 40))
         self.assertEqual(signals.color, (0, 255, 0))
+
+
+class PipelineRobustnessTests(unittest.TestCase):
+    def test_yunet_landmarks_are_sorted_for_alignment_template(self):
+        # YuNet order is detector-specific; the aligner expects image-left to right.
+        raw_face = [0, 0, 100, 100, 80, 20, 20, 20, 50, 50, 75, 80, 25, 80, 0.9]
+
+        points = FaceDetector._extract_landmarks(raw_face)
+
+        np.testing.assert_allclose(
+            points,
+            np.array([[20, 20], [80, 20], [50, 50], [25, 80], [75, 80]], dtype=np.float32),
+        )
+
+    def test_empty_identity_and_directoryless_database_are_safe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = os.path.join(directory, "database.json")
+            with open(db_path, "w") as stream:
+                json.dump({"Nobody": []}, stream)
+
+            recognizer = FaceRecognizer(db_path=db_path)
+            self.assertEqual(recognizer.identify(np.array([1, 0], dtype=np.float32)), ("Unknown", 0.0))
+
+            directoryless_path = os.path.join(directory, "nested", "database.json")
+            second = FaceRecognizer(db_path=directoryless_path)
+            second.add_identity("Alice", np.array([1, 0], dtype=np.float32))
+            self.assertTrue(os.path.exists(directoryless_path))
+
+            current_directory = os.getcwd()
+            try:
+                os.chdir(directory)
+                enroller = FaceEnroller(db_path="enrollment.json")
+                self.assertTrue(enroller.enroll_user("Alice", [np.array([1, 0])]))
+                self.assertTrue(os.path.exists("enrollment.json"))
+            finally:
+                os.chdir(current_directory)
 
 
 if __name__ == "__main__":

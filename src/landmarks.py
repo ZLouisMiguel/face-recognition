@@ -10,7 +10,7 @@ class LandmarkDetector:
 
             self.face_mesh = mp_face_mesh.FaceMesh(
                 static_image_mode=False,
-                max_num_faces=1,
+                max_num_faces=5,
                 refine_landmarks=True,
                 min_detection_confidence=0.5,
                 min_tracking_confidence=0.5,
@@ -34,6 +34,19 @@ class LandmarkDetector:
 
             if results.multi_face_landmarks:
                 face_landmarks = results.multi_face_landmarks[0]
+                if bbox is not None and len(bbox) == 4:
+                    x, y, bw, bh = bbox
+                    target = np.array([x + bw / 2.0, y + bh / 2.0])
+
+                    def face_center(face):
+                        xs = [lm.x * w for lm in face.landmark]
+                        ys = [lm.y * h for lm in face.landmark]
+                        return np.array([np.mean(xs), np.mean(ys)])
+
+                    face_landmarks = min(
+                        results.multi_face_landmarks,
+                        key=lambda face: np.linalg.norm(face_center(face) - target),
+                    )
                 pts = []
                 for idx in self.KEY_5_INDICES:
                     lm = face_landmarks.landmark[idx]

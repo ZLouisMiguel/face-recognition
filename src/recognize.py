@@ -8,7 +8,7 @@ from .detect import FaceDetector
 from .landmarks import LandmarkDetector
 from .align import FaceAligner
 from .embed import FaceEmbedder
-from .face_tracking import TargetTracker
+from .face_tracking import TargetTracker, TrackCandidate
 from .face_signals import OutputSignalManager
 
 
@@ -39,7 +39,9 @@ class FaceRecognizer:
                 data = json.load(f)
                 parsed_db = {}
                 for name, vecs in data.items():
-                    if isinstance(vecs[0], list):
+                    if not isinstance(vecs, list) or not vecs:
+                        parsed_db[name] = []
+                    elif isinstance(vecs[0], list):
                         parsed_db[name] = [np.array(v, dtype=np.float32) for v in vecs]
                     else:
                         parsed_db[name] = [np.array(vecs, dtype=np.float32)]
@@ -52,7 +54,8 @@ class FaceRecognizer:
         for name, vecs in self.database.items():
             serializable_db[name] = [v.tolist() for v in vecs]
 
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        database_dir = os.path.dirname(os.path.abspath(self.db_path))
+        os.makedirs(database_dir, exist_ok=True)
         with open(self.db_path, "w") as f:
             json.dump(serializable_db, f, indent=2)
 
@@ -114,6 +117,9 @@ class FaceRecognizer:
                     min_dist = dist
                     best_match = name
 
+        if not np.isfinite(min_dist):
+            return "Unknown", 0.0
+
         # Convert raw distance to user-friendly confidence %
         confidence = self.calculate_confidence(min_dist)
 
@@ -138,7 +144,7 @@ class FaceRecognizer:
         self.save_database()
 
 
-def run_recognition(db_path="data/database.json", cam_source=0, lock_threshold=0.4):
+def run_recognition(db_path="data/database.json", cam_source=2, lock_threshold=0.4):
     """
     Live loop: detect -> landmark -> align -> embed -> identify -> lock -> display.
 
@@ -172,41 +178,37 @@ def run_recognition(db_path="data/database.json", cam_source=0, lock_threshold=0
             print("Camera returned no frame. Stopping.")
             break
 
-        boxes = detector.detect_faces(frame)
-        embeddings = []
-        names = []
+        detections = detector.detect(frame)
+        candidates = []
 
-        for box in boxes:
-            pts = landmarker.extract_5pt(frame, bbox=box)
+        for detection in detections:
+            box = detection.box
+            pts = detection.landmarks
+            if pts is None:
+                pts = landmarker.extract_5pt(frame, bbox=box)
             aligned = aligner.align_face(frame, pts)
             emb = embedder.extract_embedding(aligned)
             if emb is None:
                 continue
-            name, _confidence = recognizer.identify(emb)
-            embeddings.append(emb)
-            names.append(name)
+            name, confidence = recognizer.identify(emb)
+            candidates.append(
+                TrackCandidate(
+                    box=box,
+                    embedding=emb,
+                    identity=name,
+                    confidence=confidence,
+                )
+            )
 
-        locked_box = None
-        is_locked = False
-
-        if tracker.locked_embedding is None:
-            # Not locked yet: acquire a lock on the first confidently
-            # recognized (non-"Unknown") identity seen in this frame.
-            for name, emb, box in zip(names, embeddings, boxes):
-                if name != "Unknown":
-                    tracker.lock_target(name, emb)
-                    break
-        else:
-            # Already locked: try to keep following that same identity.
-            locked_box, is_locked = tracker.update_lock(embeddings, boxes)
+        track = tracker.update(candidates)
 
         # --- Arduino trigger goes here once the board is connected ---
-        # if is_locked:
+        # if track.is_locked:
         #     arduino.write(b'1')
         # ----------------------------------------------------------------
 
-        signals.update_status(is_locked, tracker.locked_identity if is_locked else None)
-        display_box = locked_box if is_locked else (boxes[0] if boxes else None)
+        signals.update_status(track.is_locked, track.identity, track.state)
+        display_box = track.box
         frame = signals.draw_overlay(frame, display_box)
 
         cv2.putText(
