@@ -33,10 +33,19 @@ class FaceEnroller:
         if not embeddings:
             return False
 
-        avg_embedding = np.mean(embeddings, axis=0)
-        avg_embedding = avg_embedding / (np.linalg.norm(avg_embedding) + 1e-6)
+        normalized_embeddings = []
+        for embedding in embeddings:
+            vector = np.asarray(embedding, dtype=np.float32).reshape(-1)
+            norm = np.linalg.norm(vector)
+            if vector.size == 0 or not np.isfinite(norm) or norm < 1e-6:
+                continue
+            normalized_embeddings.append((vector / norm).tolist())
 
-        # Store multiple sample vectors per user list for robust matching
+        if not normalized_embeddings:
+            return False
+
+        # Store every sample so pose and expression variation remain available
+        # to nearest-sample recognition.
         if name not in self.database:
             self.database[name] = []
 
@@ -46,7 +55,7 @@ class FaceEnroller:
         ):
             self.database[name] = [self.database[name]]
 
-        self.database[name].append(avg_embedding.tolist())
+        self.database[name].extend(normalized_embeddings)
         self.save_database()
         return True
 

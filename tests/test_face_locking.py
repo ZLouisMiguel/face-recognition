@@ -106,6 +106,7 @@ class PipelineRobustnessTests(unittest.TestCase):
         self.assertEqual(recognize_module.display_identity("Unknown"), "Stranger")
         self.assertEqual(recognize_module.display_identity(""), "Stranger")
         self.assertEqual(recognize_module.display_identity("Alice"), "Alice")
+        self.assertEqual(recognize_module.display_identity("Unknown", "Alice"), "Alice")
 
     def test_yunet_landmarks_are_sorted_for_alignment_template(self):
         # YuNet order is detector-specific; the aligner expects image-left to right.
@@ -140,6 +141,22 @@ class PipelineRobustnessTests(unittest.TestCase):
                 self.assertTrue(os.path.exists("enrollment.json"))
             finally:
                 os.chdir(current_directory)
+
+    def test_enrollment_preserves_each_expression_sample(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "database.json")
+            enroller = FaceEnroller(db_path=path)
+            samples = [
+                np.array([1.0, 0.0]),
+                np.array([0.0, 1.0]),
+                np.array([1.0, 1.0]),
+            ]
+
+            self.assertTrue(enroller.enroll_user("Alice", samples))
+            stored = enroller.database["Alice"]
+            self.assertEqual(len(stored), len(samples))
+            for vector in stored:
+                self.assertAlmostEqual(float(np.linalg.norm(vector)), 1.0, places=5)
 
 
 if __name__ == "__main__":

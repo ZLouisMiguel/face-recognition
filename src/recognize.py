@@ -12,8 +12,10 @@ from .face_tracking import TargetTracker, TrackCandidate
 from .face_signals import OutputSignalManager
 
 
-def display_identity(identity_name):
+def display_identity(identity_name, locked_identity=None):
     """Return the user-facing label for a recognition result."""
+    if identity_name == "Unknown" and locked_identity:
+        return locked_identity
     if not identity_name or identity_name == "Unknown":
         return "Stranger"
     return identity_name
@@ -197,14 +199,10 @@ def run_recognition(db_path="data/database.json", cam_source=2, lock_threshold=0
             aligned = aligner.align_face(frame, pts)
             emb = embedder.extract_embedding(aligned)
             if emb is None:
-                face_annotations.append((box, "Stranger", (0, 0, 255)))
+                face_annotations.append((box, "Unknown", 0.0))
                 continue
             name, confidence = recognizer.identify(emb)
-            label = display_identity(name)
-            color = (0, 0, 255) if name == "Unknown" else (255, 200, 0)
-            if name != "Unknown":
-                label = f"{label} ({confidence:.1f}%)"
-            face_annotations.append((box, label, color))
+            face_annotations.append((box, name, confidence))
             candidates.append(
                 TrackCandidate(
                     box=box,
@@ -216,7 +214,20 @@ def run_recognition(db_path="data/database.json", cam_source=2, lock_threshold=0
 
         track = tracker.update(candidates)
 
-        for box, label, color in face_annotations:
+        for box, name, confidence in face_annotations:
+            is_locked_target = track.is_locked and box == track.box
+            label = display_identity(
+                name,
+                locked_identity=track.identity if is_locked_target else None,
+            )
+            if is_locked_target:
+                color = (0, 255, 0)
+            elif name == "Unknown":
+                color = (0, 0, 255)
+            else:
+                color = (255, 200, 0)
+            if name != "Unknown":
+                label = f"{label} ({confidence:.1f}%)"
             x, y, width, height = box
             cv2.rectangle(frame, (x, y), (x + width, y + height), color, 2)
             cv2.putText(

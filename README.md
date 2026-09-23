@@ -28,6 +28,8 @@ The tests cover acquisition debounce, skipped embeddings, wrong-identity rejecti
 
 Enter a name, face the camera, press `SPACE` to capture samples, then press `s` to save. Capture at least three clear samples with small changes in pose or expression. Press `q` to cancel.
 
+For expression robustness, capture neutral, smiling, and slightly turned-face samples. Every normalized sample is now preserved instead of being averaged into one expression-specific vector. Re-enrolling an existing name appends the new samples to that identity profile.
+
 The current working checkout is configured for camera index `2`. On the development machine, `camprobe.py` found index `1` working and index `2` unavailable, so run the probe first and change `cam_source` in `src/enroll.py` and `src/recognize.py` if needed.
 
 ## Run face recognition and identity lock
