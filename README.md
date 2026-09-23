@@ -43,6 +43,8 @@ Expected live behavior:
 3. A short detector gap shows `TARGET LOST: <name>` in orange and can reacquire the same person.
 4. After a longer loss, the system resets to searching and requires a new identity lock.
 
+Every detected face is boxed. Known faces show their enrolled name; faces that are not in the database show `Stranger` in red.
+
 Controls:
 
 - `q`: quit.

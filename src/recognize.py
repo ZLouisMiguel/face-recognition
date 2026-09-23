@@ -12,6 +12,13 @@ from .face_tracking import TargetTracker, TrackCandidate
 from .face_signals import OutputSignalManager
 
 
+def display_identity(identity_name):
+    """Return the user-facing label for a recognition result."""
+    if not identity_name or identity_name == "Unknown":
+        return "Stranger"
+    return identity_name
+
+
 class FaceRecognizer:
     def __init__(self, db_path="data/database.json", threshold=0.9):
         """
@@ -180,6 +187,7 @@ def run_recognition(db_path="data/database.json", cam_source=2, lock_threshold=0
 
         detections = detector.detect(frame)
         candidates = []
+        face_annotations = []
 
         for detection in detections:
             box = detection.box
@@ -189,8 +197,14 @@ def run_recognition(db_path="data/database.json", cam_source=2, lock_threshold=0
             aligned = aligner.align_face(frame, pts)
             emb = embedder.extract_embedding(aligned)
             if emb is None:
+                face_annotations.append((box, "Stranger", (0, 0, 255)))
                 continue
             name, confidence = recognizer.identify(emb)
+            label = display_identity(name)
+            color = (0, 0, 255) if name == "Unknown" else (255, 200, 0)
+            if name != "Unknown":
+                label = f"{label} ({confidence:.1f}%)"
+            face_annotations.append((box, label, color))
             candidates.append(
                 TrackCandidate(
                     box=box,
@@ -201,6 +215,19 @@ def run_recognition(db_path="data/database.json", cam_source=2, lock_threshold=0
             )
 
         track = tracker.update(candidates)
+
+        for box, label, color in face_annotations:
+            x, y, width, height = box
+            cv2.rectangle(frame, (x, y), (x + width, y + height), color, 2)
+            cv2.putText(
+                frame,
+                label,
+                (x, max(20, y - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
+            )
 
         # --- Arduino trigger goes here once the board is connected ---
         # if track.is_locked:

@@ -11,6 +11,7 @@ from src.face_tracking import TargetTracker
 from src.detect import FaceDetector
 from src.enroll import FaceEnroller
 from src.recognize import FaceRecognizer
+from src import recognize as recognize_module
 
 try:
     from src.face_tracking import TrackCandidate
@@ -101,6 +102,11 @@ class OutputSignalManagerTests(unittest.TestCase):
 
 
 class PipelineRobustnessTests(unittest.TestCase):
+    def test_unknown_identity_is_displayed_as_stranger(self):
+        self.assertEqual(recognize_module.display_identity("Unknown"), "Stranger")
+        self.assertEqual(recognize_module.display_identity(""), "Stranger")
+        self.assertEqual(recognize_module.display_identity("Alice"), "Alice")
+
     def test_yunet_landmarks_are_sorted_for_alignment_template(self):
         # YuNet order is detector-specific; the aligner expects image-left to right.
         raw_face = [0, 0, 100, 100, 80, 20, 20, 20, 50, 50, 75, 80, 25, 80, 0.9]
